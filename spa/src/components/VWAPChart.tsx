@@ -27,13 +27,14 @@ const Y_AXIS_LABELS: Record<YAxisKey, string> = {
 
 const CHART_STYLE = {
   contentStyle: {
-    background: '#111827',
-    border: '1px solid #374151',
+    background: '#ffffff',
+    border: '1px solid #d1d5db',
     borderRadius: '6px',
     fontSize: '11px',
+    color: '#111827',
   },
-  labelStyle: { color: '#9ca3af' },
-  itemStyle: { color: '#d1d5db' },
+  labelStyle: { color: '#374151' },
+  itemStyle: { color: '#374151' },
 }
 
 // ── Per-panel export toolbar ──────────────────────────────────────────────────
@@ -59,13 +60,13 @@ function ExportBar({
 
   return (
     <div className="flex gap-2 justify-end mt-1.5">
-      <span className="text-xs text-gray-700 mr-1 self-center">Export:</span>
+      <span className="text-xs text-gray-400 mr-1 self-center">Export:</span>
       {(['svg', 'png', 'jpg'] as ExportFormat[]).map((fmt) => (
         <button
           key={fmt}
           onClick={() => handle(fmt)}
           disabled={exporting !== null}
-          className="text-xs text-gray-500 hover:text-gray-200 uppercase tracking-wide transition-colors disabled:opacity-40 px-1"
+          className="text-xs text-gray-400 hover:text-blue-600 uppercase tracking-wide transition-colors disabled:opacity-40 px-1 font-medium"
           title={`Export as ${fmt.toUpperCase()}`}
         >
           {exporting === fmt ? '…' : fmt}
@@ -100,7 +101,6 @@ export default function VWAPChart() {
 
   const priceData = showToday ? today!.bars.map((b) => ({ time: b.time, close: b.close })) : []
 
-  // Scatter chart numeric domain
   const simMins = showSim
     ? simulation.flatMap((s) => s.schedule.map((p) => timeToMinutes(p.time)))
     : []
@@ -122,10 +122,10 @@ export default function VWAPChart() {
           <button
             key={v}
             onClick={() => setYAxis(v)}
-            className={`text-xs px-3 py-1 rounded transition-colors ${
+            className={`text-xs px-3 py-1 rounded border transition-colors ${
               yAxis === v
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
             }`}
           >
             {v === 'PctBuckets' ? 'Pct Buckets' : v}
@@ -135,35 +135,36 @@ export default function VWAPChart() {
 
       {/* ── Main VWAP Profile Chart ── */}
       {!hasCurves ? (
-        <div className="h-72 flex flex-col items-center justify-center text-gray-600 border border-gray-800 rounded-lg gap-2">
-          <p className="text-sm">No curves loaded</p>
+        <div className="h-72 flex flex-col items-center justify-center text-gray-400 border border-dashed border-gray-300 rounded-lg gap-2 bg-white">
+          <p className="text-sm font-medium text-gray-500">No curves loaded</p>
           <p className="text-xs">Generate a Bloomberg curve or import a CSV to get started.</p>
         </div>
       ) : (
-        <div>
-          <p className="text-xs text-gray-500 mb-2">
-            VWAP Volume Profile · {Y_AXIS_LABELS[yAxis]}
-            {today && todayVisible && (
-              <span className="ml-2 text-gray-600">· bars = today ({today.date})</span>
-            )}
-          </p>
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-medium text-gray-600">
+              VWAP Volume Profile · {Y_AXIS_LABELS[yAxis]}
+              {today && todayVisible && (
+                <span className="ml-2 text-gray-400">· bars = today ({today.date})</span>
+              )}
+            </p>
+          </div>
 
-          {/* Capturable panel */}
-          <div ref={profileRef} className="bg-gray-950 rounded p-1">
-            <ResponsiveContainer width="100%" height={300}>
+          <div ref={profileRef} className="bg-white">
+            <ResponsiveContainer width="100%" height={600}>
               <ComposedChart
                 data={mergedData}
                 syncId="vwap-chart"
                 margin={{ top: 4, right: 12, bottom: 4, left: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis
                   dataKey="time"
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  tick={{ fill: '#9ca3af', fontSize: 10 }}
                   interval={29}
                 />
                 <YAxis
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  tick={{ fill: '#9ca3af', fontSize: 10 }}
                   tickFormatter={(v: number) =>
                     yAxis === 'AvgVolume' ? v.toFixed(1) : v.toFixed(2)
                   }
@@ -177,23 +178,21 @@ export default function VWAPChart() {
                       : [String(v)]
                   }
                 />
-                <Legend
-                  wrapperStyle={{ color: '#9ca3af', fontSize: '11px', paddingTop: '8px' }}
-                />
+                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
 
-                {/* Today's volume as solid bars (rendered first so lines sit on top) */}
+                {/* Today's volume as solid bars (behind the historical lines) */}
                 {todayProfile && (
                   <Bar
                     dataKey="__today__"
                     name={`Today (${today!.date})`}
-                    fill="#6b7280"
-                    opacity={0.55}
+                    fill="#94a3b8"
+                    opacity={0.5}
                     barSize={2}
                     isAnimationActive={false}
                   />
                 )}
 
-                {/* Historical curves as lines */}
+                {/* Historical curves */}
                 {curves.filter((c) => c.visible).map((c) => (
                   <Line
                     key={c.id}
@@ -216,26 +215,26 @@ export default function VWAPChart() {
 
       {/* ── Today's Price Chart ── */}
       {showToday && priceData.length > 0 && (
-        <div>
-          <p className="text-xs text-gray-500 mb-2">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <p className="text-xs font-medium text-gray-600 mb-3">
             Today's Last Price · {today!.date}
           </p>
 
-          <div ref={priceRef} className="bg-gray-950 rounded p-1">
-            <ResponsiveContainer width="100%" height={180}>
+          <div ref={priceRef} className="bg-white">
+            <ResponsiveContainer width="100%" height={360}>
               <LineChart
                 data={priceData}
                 syncId="vwap-chart"
                 margin={{ top: 4, right: 12, bottom: 4, left: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis
                   dataKey="time"
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  tick={{ fill: '#9ca3af', fontSize: 10 }}
                   interval={29}
                 />
                 <YAxis
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  tick={{ fill: '#9ca3af', fontSize: 10 }}
                   width={52}
                   domain={['auto', 'auto']}
                 />
@@ -248,7 +247,7 @@ export default function VWAPChart() {
                 <Line
                   dataKey="close"
                   name="Last Price"
-                  stroke="#93c5fd"
+                  stroke="#3b82f6"
                   dot={false}
                   strokeWidth={1.5}
                   connectNulls={false}
@@ -264,15 +263,15 @@ export default function VWAPChart() {
 
       {/* ── Simulation Dot Plot ── */}
       {showSim && (
-        <div>
-          <p className="text-xs text-gray-500 mb-2">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <p className="text-xs font-medium text-gray-600 mb-3">
             Order Simulation · Child Orders (contracts per minute)
           </p>
 
-          <div ref={simRef} className="bg-gray-950 rounded p-1">
-            <ResponsiveContainer width="100%" height={200}>
+          <div ref={simRef} className="bg-white">
+            <ResponsiveContainer width="100%" height={400}>
               <ScatterChart margin={{ top: 4, right: 12, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis
                   type="number"
                   dataKey="x"
@@ -280,19 +279,19 @@ export default function VWAPChart() {
                   domain={[simXMin, simXMax]}
                   ticks={simHourTicks}
                   tickFormatter={(v: number) => minutesToHHMM(v)}
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  tick={{ fill: '#9ca3af', fontSize: 10 }}
                 />
                 <YAxis
                   type="number"
                   dataKey="y"
                   name="Qty"
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  tick={{ fill: '#9ca3af', fontSize: 10 }}
                   width={52}
                   allowDecimals={false}
                 />
                 <ZAxis range={[40, 40]} />
                 <Tooltip
-                  cursor={{ strokeDasharray: '3 3', stroke: '#374151' }}
+                  cursor={{ strokeDasharray: '3 3', stroke: '#d1d5db' }}
                   {...CHART_STYLE}
                   formatter={(v: unknown, name: unknown) => [
                     `${v} contracts`,
@@ -302,9 +301,7 @@ export default function VWAPChart() {
                     typeof label === 'number' ? minutesToHHMM(label) : String(label ?? '')
                   }
                 />
-                <Legend
-                  wrapperStyle={{ color: '#9ca3af', fontSize: '11px', paddingTop: '8px' }}
-                />
+                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                 {simulation.map((sim) => (
                   <Scatter
                     key={sim.curveId}
@@ -323,16 +320,15 @@ export default function VWAPChart() {
 
           <ExportBar label="simulation" chartRef={simRef} />
 
-          {/* Summary rows */}
-          <div className="mt-2 space-y-1">
+          <div className="mt-3 space-y-1 border-t border-gray-100 pt-3">
             {simulation.map((sim) => (
               <div key={sim.curveId} className="flex items-center gap-2 text-xs">
                 <span
                   className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: sim.color }}
                 />
-                <span className="text-gray-400 truncate min-w-0">{sim.curveLabel}</span>
-                <span className="text-gray-300 flex-shrink-0 ml-auto">
+                <span className="text-gray-500 truncate min-w-0">{sim.curveLabel}</span>
+                <span className="text-gray-700 flex-shrink-0 ml-auto">
                   {sim.totalScheduled} contracts · {sim.schedule.length} child orders
                 </span>
               </div>

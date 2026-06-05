@@ -29,12 +29,7 @@ export default function SimulationPanel() {
       return
     }
     setError('')
-    const results = visibleCurves.map((c) => simulateVWAP(c, quantity, startTime, endTime))
-    setSimulation(results)
-  }
-
-  function handleClear() {
-    setSimulation([])
+    setSimulation(visibleCurves.map((c) => simulateVWAP(c, quantity, startTime, endTime)))
   }
 
   return (
@@ -43,7 +38,7 @@ export default function SimulationPanel() {
 
       <div className="space-y-2">
         <div>
-          <label className="block text-xs text-gray-400 mb-1">Order Quantity (contracts)</label>
+          <label className="block text-xs text-gray-600 mb-1">Order Quantity (contracts)</label>
           <input
             type="number"
             className="input"
@@ -56,7 +51,7 @@ export default function SimulationPanel() {
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Start Time</label>
+            <label className="block text-xs text-gray-600 mb-1">Start Time</label>
             <input
               type="time"
               className="input"
@@ -65,7 +60,7 @@ export default function SimulationPanel() {
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">End Time</label>
+            <label className="block text-xs text-gray-600 mb-1">End Time</label>
             <input
               type="time"
               className="input"
@@ -76,7 +71,7 @@ export default function SimulationPanel() {
         </div>
 
         {error && (
-          <p className="text-red-400 text-xs bg-red-950/30 border border-red-900/50 rounded px-2 py-1">
+          <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded px-2 py-1">
             {error}
           </p>
         )}
@@ -86,22 +81,22 @@ export default function SimulationPanel() {
             Simulate
           </button>
           {simulation.length > 0 && (
-            <button onClick={handleClear} className="btn-secondary px-3">
+            <button onClick={() => setSimulation([])} className="btn-secondary px-3">
               Clear
             </button>
           )}
         </div>
 
         {simulation.length > 0 && (
-          <div className="space-y-1 pt-1">
+          <div className="space-y-1 pt-1 border-t border-gray-100 mt-1">
             {simulation.map((sim) => (
               <div key={sim.curveId} className="flex items-center gap-2 text-xs">
                 <span
                   className="w-2 h-2 rounded-full flex-shrink-0"
                   style={{ backgroundColor: sim.color }}
                 />
-                <span className="text-gray-400 truncate">{sim.curveLabel}:</span>
-                <span className="text-gray-200 flex-shrink-0">
+                <span className="text-gray-500 truncate">{sim.curveLabel}:</span>
+                <span className="text-gray-800 flex-shrink-0">
                   {sim.totalScheduled} contracts · {sim.schedule.length} orders
                 </span>
               </div>

@@ -45,7 +45,7 @@ export async function exportChart(
   }
 
   const opts = {
-    backgroundColor: '#030712',   // gray-950 — matches the app background
+    backgroundColor: '#ffffff',   // white — matches the light theme
     pixelRatio: 2,                 // 2× for crispness
   }
 

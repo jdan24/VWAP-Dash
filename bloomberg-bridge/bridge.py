@@ -182,6 +182,25 @@ def _get_reference_fields(ticker: str, fields: list[str]) -> dict[str, Any]:
         session.stop()
 
 
+def _bar_hhmm(raw_time: str, tz: Any) -> str:
+    """
+    Extract HH:MM from a bar timestamp in exchange-local time.
+
+    Bloomberg sometimes returns bar times as UTC-aware Python datetimes
+    (e.g. "2026-06-05T14:30:00+00:00") and sometimes as naive ISO strings
+    that are already in exchange local time (e.g. "2026-06-05T09:30:00").
+    Both cases are handled: UTC-aware values are converted to exchange local
+    using the known pytz timezone before extracting HH:MM.
+    """
+    try:
+        dt = datetime.fromisoformat(raw_time)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(tz)
+        return dt.strftime("%H:%M")
+    except Exception:
+        return raw_time[11:16]  # last-resort slice fallback
+
+
 def _get_intraday_bars_raw(
     ticker: str,
     start_utc: datetime,
@@ -351,7 +370,7 @@ def vwap_curve(
 
             bar_vol: dict[str, int] = {}
             for bar in bars:
-                hhmm = bar["time"][11:16]  # exchange-local "HH:MM" from naive ISO string
+                hhmm = _bar_hhmm(bar["time"], tz)
                 bar_vol[hhmm] = bar_vol.get(hhmm, 0) + bar["volume"]
 
             for m in canonical:
@@ -437,7 +456,7 @@ def today_bars(
     bars = _get_intraday_bars_raw(ticker, day_start_utc, day_end_utc, 1)
 
     formatted = [
-        {"time": bar["time"][11:16], "volume": bar["volume"], "close": bar["close"]}
+        {"time": _bar_hhmm(bar["time"], tz), "volume": bar["volume"], "close": bar["close"]}
         for bar in bars
     ]
 

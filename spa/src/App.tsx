@@ -12,7 +12,6 @@ import { fetchHealth } from './lib/bridgeClient'
 export default function App() {
   const setBloombergConnected = useVWAPStore((s) => s.setBloombergConnected)
 
-  // Poll Bloomberg bridge health every 5 seconds
   useEffect(() => {
     async function poll() {
       try {
@@ -28,12 +27,12 @@ export default function App() {
   }, [setBloombergConnected])
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-gray-900 flex flex-col">
       <Header />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* ── Left sidebar ── */}
-        <aside className="w-80 flex-shrink-0 bg-gray-900 border-r border-gray-800 overflow-y-auto">
+        {/* Left sidebar */}
+        <aside className="w-80 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto shadow-sm">
           <div className="p-4 space-y-0">
             <CurveBuilder />
             <CurveList />
@@ -42,8 +41,8 @@ export default function App() {
           </div>
         </aside>
 
-        {/* ── Main chart area ── */}
-        <main className="flex-1 overflow-y-auto p-6">
+        {/* Main chart area */}
+        <main className="flex-1 overflow-y-auto p-6 bg-slate-50">
           <VWAPChart />
         </main>
       </div>

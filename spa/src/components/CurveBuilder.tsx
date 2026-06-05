@@ -76,7 +76,7 @@ export default function CurveBuilder() {
 
       <div className="space-y-2.5">
         <div>
-          <label className="block text-xs text-gray-400 mb-1">Bloomberg Ticker</label>
+          <label className="block text-xs text-gray-600 mb-1">Bloomberg Ticker</label>
           <input
             className="input"
             value={security}
@@ -87,7 +87,7 @@ export default function CurveBuilder() {
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Start Date</label>
+            <label className="block text-xs text-gray-600 mb-1">Start Date</label>
             <input
               type="date"
               className="input"
@@ -96,7 +96,7 @@ export default function CurveBuilder() {
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Session Start</label>
+            <label className="block text-xs text-gray-600 mb-1">Session Start</label>
             <input
               type="time"
               className="input"
@@ -108,7 +108,7 @@ export default function CurveBuilder() {
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">End Date</label>
+            <label className="block text-xs text-gray-600 mb-1">End Date</label>
             <input
               type="date"
               className="input"
@@ -117,7 +117,7 @@ export default function CurveBuilder() {
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Session End</label>
+            <label className="block text-xs text-gray-600 mb-1">Session End</label>
             <input
               type="time"
               className="input"
@@ -128,8 +128,8 @@ export default function CurveBuilder() {
         </div>
 
         <div>
-          <label className="block text-xs text-gray-400 mb-1">
-            TZ Override <span className="text-gray-600">(e.g. Europe/Rome)</span>
+          <label className="block text-xs text-gray-600 mb-1">
+            TZ Override <span className="text-gray-400">(e.g. America/Chicago)</span>
           </label>
           <input
             className="input"
@@ -141,7 +141,7 @@ export default function CurveBuilder() {
 
         <div className="flex items-center gap-3">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Smooth Window</label>
+            <label className="block text-xs text-gray-600 mb-1">Smooth Window</label>
             <input
               type="number"
               className="input w-20"
@@ -151,21 +151,21 @@ export default function CurveBuilder() {
               onChange={(e) => setSmoothWindow(Math.max(1, parseInt(e.target.value) || 6))}
             />
           </div>
-          <p className="text-xs text-gray-600 mt-4">minutes (centered rolling avg)</p>
+          <p className="text-xs text-gray-400 mt-4">minutes (centered avg)</p>
         </div>
 
         {error && (
-          <p className="text-red-400 text-xs bg-red-950/30 border border-red-900/50 rounded px-2 py-1.5">
+          <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded px-2 py-1.5">
             {error}
           </p>
         )}
 
         {atLimit && (
-          <p className="text-yellow-500 text-xs">Max 4 curves. Remove one to generate another.</p>
+          <p className="text-amber-600 text-xs">Max 4 curves. Remove one to generate another.</p>
         )}
 
         {!bloombergConnected && (
-          <p className="text-gray-500 text-xs">Bloomberg bridge offline — cannot generate curves.</p>
+          <p className="text-gray-400 text-xs">Bloomberg bridge offline — cannot generate curves.</p>
         )}
 
         <button onClick={handleGenerate} disabled={disabled} className="btn-primary w-full">

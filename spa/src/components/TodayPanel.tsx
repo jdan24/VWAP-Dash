@@ -14,7 +14,6 @@ export default function TodayPanel() {
       setTodayVisible: s.setTodayVisible,
     }))
 
-  // Default to params from the first Bloomberg-generated curve if available
   const firstParams = curves.find((c) => c.params)?.params
   const [security, setSecurity] = useState(firstParams?.security ?? 'ES1 Index')
   const [sessionStart, setSessionStart] = useState(
@@ -62,7 +61,7 @@ export default function TodayPanel() {
         {today && (
           <button
             onClick={() => setTodayVisible(!todayVisible)}
-            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
           >
             {todayVisible ? 'Hide' : 'Show'}
           </button>
@@ -71,7 +70,7 @@ export default function TodayPanel() {
 
       <div className="space-y-2">
         <div>
-          <label className="block text-xs text-gray-400 mb-1">Ticker</label>
+          <label className="block text-xs text-gray-600 mb-1">Ticker</label>
           <input
             className="input"
             value={security}
@@ -81,7 +80,7 @@ export default function TodayPanel() {
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Session Start</label>
+            <label className="block text-xs text-gray-600 mb-1">Session Start</label>
             <input
               type="time"
               className="input"
@@ -90,7 +89,7 @@ export default function TodayPanel() {
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">TZ Override</label>
+            <label className="block text-xs text-gray-600 mb-1">TZ Override</label>
             <input
               className="input"
               value={tzOverride}
@@ -101,13 +100,13 @@ export default function TodayPanel() {
         </div>
 
         {error && (
-          <p className="text-red-400 text-xs bg-red-950/30 border border-red-900/50 rounded px-2 py-1">
+          <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded px-2 py-1">
             {error}
           </p>
         )}
 
         {today && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-400">
             {today.date} · {today.bars.length} bars loaded
           </p>
         )}
@@ -121,7 +120,7 @@ export default function TodayPanel() {
         </button>
 
         {!bloombergConnected && (
-          <p className="text-xs text-gray-600">Bloomberg offline</p>
+          <p className="text-xs text-gray-400">Bloomberg offline</p>
         )}
       </div>
     </div>

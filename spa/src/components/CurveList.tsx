@@ -46,11 +46,11 @@ export default function CurveList() {
     <div className="panel-section">
       <div className="flex items-center justify-between mb-3">
         <h2 className="section-heading mb-0">Curves</h2>
-        <span className="text-xs text-gray-600">{curves.length} / 4</span>
+        <span className="text-xs text-gray-400">{curves.length} / 4</span>
       </div>
 
       {curves.length === 0 && (
-        <p className="text-xs text-gray-600 mb-3">
+        <p className="text-xs text-gray-400 mb-3">
           No curves loaded. Generate one from Bloomberg or import a CSV / XLSX.
         </p>
       )}
@@ -70,7 +70,7 @@ export default function CurveList() {
       </div>
 
       {importError && (
-        <p className="text-red-400 text-xs mb-2 bg-red-950/30 border border-red-900/50 rounded px-2 py-1">
+        <p className="text-red-600 text-xs mb-2 bg-red-50 border border-red-200 rounded px-2 py-1">
           {importError}
         </p>
       )}
@@ -110,7 +110,7 @@ function CurveRow({
 }) {
   return (
     <div
-      className={`flex items-center gap-2 p-2 rounded bg-gray-800/60 border border-gray-700/50 ${
+      className={`flex items-center gap-2 p-2 rounded bg-white border border-gray-200 shadow-sm ${
         !curve.visible ? 'opacity-40' : ''
       }`}
     >
@@ -124,21 +124,21 @@ function CurveRow({
           title="Change color"
         />
         <div
-          className="w-5 h-5 rounded border border-gray-600 flex-shrink-0"
+          className="w-5 h-5 rounded border border-gray-300 flex-shrink-0"
           style={{ backgroundColor: curve.color }}
         />
       </div>
 
       {/* Label */}
       <input
-        className="flex-1 bg-transparent text-xs text-gray-200 focus:outline-none min-w-0 truncate"
+        className="flex-1 bg-transparent text-xs text-gray-800 focus:outline-none min-w-0 truncate"
         value={curve.label}
         onChange={(e) => onLabelChange(e.target.value)}
         title={curve.label}
       />
 
       {/* Source badge */}
-      <span className="text-xs text-gray-600 flex-shrink-0">
+      <span className="text-xs text-gray-400 flex-shrink-0 bg-gray-100 px-1 rounded">
         {curve.source === 'imported' ? 'CSV' : 'BBG'}
       </span>
 
@@ -146,7 +146,7 @@ function CurveRow({
       <button
         onClick={onToggle}
         title={curve.visible ? 'Hide curve' : 'Show curve'}
-        className="text-gray-400 hover:text-white text-xs flex-shrink-0 transition-colors"
+        className="text-gray-400 hover:text-gray-700 text-xs flex-shrink-0 transition-colors"
       >
         {curve.visible ? '●' : '○'}
       </button>
@@ -156,7 +156,7 @@ function CurveRow({
         <button
           onClick={onExport}
           title="Export to CSV"
-          className="text-gray-500 hover:text-green-400 text-xs flex-shrink-0 transition-colors"
+          className="text-gray-400 hover:text-green-600 text-xs flex-shrink-0 transition-colors"
         >
           ↓
         </button>
@@ -166,7 +166,7 @@ function CurveRow({
       <button
         onClick={onRemove}
         title="Remove curve"
-        className="text-gray-500 hover:text-red-400 text-xs flex-shrink-0 transition-colors"
+        className="text-gray-400 hover:text-red-500 text-xs flex-shrink-0 transition-colors"
       >
         ✕
       </button>
