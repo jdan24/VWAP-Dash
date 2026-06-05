@@ -419,24 +419,36 @@ def vwap_curve(
     pct_buckets = [v / total_avg * 100 for v in avg_volumes]
     smoothed = _rolling_smooth(pct_buckets, smooth_window)
 
-    placeholder_date = start_local.date().isoformat()
+    # "time" field uses tz_override when set; defaults to UTC so users without a TZ
+    # selection always see unambiguous UTC labels on the chart x-axis.
+    display_tz = tz if tz_override.strip() else pytz.utc
+
+    # Build result with correct per-minute dates (overnight sessions cross midnight,
+    # so times 00:00-session_end belong to start_date+1, not start_date).
+    start_date = start_local.date()
+    cur_date = start_date
     result = []
     for i, m in enumerate(canonical):
-        time_exchange = f"{placeholder_date} {m}:00"
         try:
-            local_dt = tz.localize(datetime.strptime(f"{placeholder_date} {m}", "%Y-%m-%d %H:%M"))
+            local_dt = tz.localize(datetime.strptime(f"{cur_date} {m}", "%Y-%m-%d %H:%M"))
+            display_time = local_dt.astimezone(display_tz).strftime("%H:%M")
+            time_exchange = local_dt.strftime("%Y-%m-%d %H:%M:%S")
             time_utc = local_dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         except Exception:
+            display_time = m
+            time_exchange = f"{cur_date} {m}:00"
             time_utc = time_exchange
 
         result.append({
-            "time": m,
+            "time": display_time,
             "AvgVolume": round(avg_volumes[i], 6),
             "Time_Exchange": time_exchange,
             "Time_UTC": time_utc,
             "PctBuckets": round(pct_buckets[i], 6),
             "Smoothed": round(smoothed[i], 6),
         })
+        if m == "23:59" and overnight:
+            cur_date = start_date + timedelta(days=1)
 
     return result
 
@@ -500,8 +512,9 @@ def today_bars(
 
     bars = _get_intraday_bars_raw(ticker, day_start_utc, day_end_utc, 1)
 
+    display_tz = tz if tz_override.strip() else pytz.utc
     formatted = [
-        {"time": _bar_hhmm(bar["time"], tz), "volume": bar["volume"], "close": bar["close"]}
+        {"time": _bar_hhmm(bar["time"], display_tz), "volume": bar["volume"], "close": bar["close"]}
         for bar in bars
     ]
 

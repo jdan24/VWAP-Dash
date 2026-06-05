@@ -35,6 +35,7 @@ export interface TodayData {
   date: string            // "YYYY-MM-DD"
   bars: TodayBar[]
   profile: Array<{ time: string; pct: number }>  // running pct of today's volume
+  tzOverride: string      // tz selected when fetching ("" = UTC was used)
 }
 
 export interface SimSchedule {

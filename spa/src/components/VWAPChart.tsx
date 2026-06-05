@@ -19,6 +19,31 @@ import { useVWAPStore } from '../store/useVWAPStore'
 import { mergeCurveData, timeToMinutes, minutesToHHMM } from '../lib/curveUtils'
 import { exportChart, type ExportFormat } from '../lib/chartExport'
 import type { YAxisKey } from '../store/useVWAPStore'
+import type { VWAPCurve } from '../types'
+
+const TZ_SHORT: Record<string, string> = {
+  'America/New_York':   'ET',
+  'America/Chicago':    'CT',
+  'America/Los_Angeles':'PT',
+  'Europe/London':      'GMT/BST',
+  'Europe/Berlin':      'CET',
+  'Europe/Rome':        'CET',
+  'Asia/Tokyo':         'JST',
+  'Asia/Singapore':     'SGT',
+  'Asia/Hong_Kong':     'HKT',
+  'Australia/Sydney':   'AEST',
+  'UTC':                'UTC',
+}
+
+function tzLabel(tzOverride: string): string {
+  if (!tzOverride) return 'UTC'
+  return TZ_SHORT[tzOverride] ?? tzOverride
+}
+
+function curveTzLabel(curves: VWAPCurve[]): string {
+  const tz = curves.find((c) => c.visible && c.params)?.params?.tzOverride ?? ''
+  return tzLabel(tz)
+}
 
 const Y_AXIS_LABELS: Record<YAxisKey, string> = {
   PctBuckets: 'Pct Buckets (raw)',
@@ -145,6 +170,7 @@ export default function VWAPChart() {
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-medium text-gray-600">
               VWAP Volume Profile · {Y_AXIS_LABELS[yAxis]}
+              <span className="ml-2 text-gray-400">· {curveTzLabel(curves)}</span>
               {today && todayVisible && (
                 <span className="ml-2 text-gray-400">· bars = today ({today.date})</span>
               )}
@@ -227,6 +253,7 @@ export default function VWAPChart() {
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-medium text-gray-600">
               Today's Last Price · {today!.date}
+              <span className="ml-2 text-gray-400">· {tzLabel(today!.tzOverride)}</span>
             </p>
             <ExportBar label={`price_${today!.date}`} chartRef={priceRef} />
           </div>

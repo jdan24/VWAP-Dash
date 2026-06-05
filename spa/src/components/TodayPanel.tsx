@@ -69,7 +69,7 @@ export default function TodayPanel() {
         pct: totalVolume > 0 ? (b.volume / totalVolume) * 100 : 0,
       }))
 
-      const data: TodayData = { date: result.date, bars, profile }
+      const data: TodayData = { date: result.date, bars, profile, tzOverride: tzOverride.trim() }
       setToday(data)
       setTodayVisible(true)
     } catch (err: unknown) {
