@@ -3,6 +3,25 @@ import { useVWAPStore } from '../store/useVWAPStore'
 import { fetchTodayBars } from '../lib/bridgeClient'
 import type { TodayData, TodayBar } from '../types'
 
+const TZ_OPTIONS = [
+  { value: '', label: 'auto-detect from Bloomberg' },
+  { value: 'America/New_York', label: 'America/New_York (Eastern)' },
+  { value: 'America/Chicago', label: 'America/Chicago (Central)' },
+  { value: 'America/Los_Angeles', label: 'America/Los_Angeles (Pacific)' },
+  { value: 'Europe/London', label: 'Europe/London' },
+  { value: 'Europe/Berlin', label: 'Europe/Berlin (CET/CEST)' },
+  { value: 'Europe/Rome', label: 'Europe/Rome' },
+  { value: 'Asia/Tokyo', label: 'Asia/Tokyo (JST)' },
+  { value: 'Asia/Singapore', label: 'Asia/Singapore (SGT)' },
+  { value: 'Asia/Hong_Kong', label: 'Asia/Hong_Kong (HKT)' },
+  { value: 'Australia/Sydney', label: 'Australia/Sydney (AEST)' },
+  { value: 'UTC', label: 'UTC' },
+]
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
 export default function TodayPanel() {
   const { bloombergConnected, curves, today, setToday, todayVisible, setTodayVisible } =
     useVWAPStore((s) => ({
@@ -16,6 +35,7 @@ export default function TodayPanel() {
 
   const firstParams = curves.find((c) => c.params)?.params
   const [security, setSecurity] = useState(firstParams?.security ?? 'ES1 Index')
+  const [startDate, setStartDate] = useState(todayISO())
   const [sessionStart, setSessionStart] = useState(
     firstParams?.start?.slice(11, 16) ?? '09:30',
   )
@@ -39,6 +59,7 @@ export default function TodayPanel() {
         session_start: sessionStart,
         session_end: sessionEnd,
         tz_override: tzOverride.trim(),
+        start_date: startDate,
       })
 
       const bars: TodayBar[] = result.bars
@@ -82,6 +103,16 @@ export default function TodayPanel() {
           />
         </div>
 
+        <div>
+          <label className="block text-xs text-gray-600 mb-1">Session Start Date</label>
+          <input
+            type="date"
+            className="input"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-xs text-gray-600 mb-1">Session Start</label>
@@ -105,12 +136,15 @@ export default function TodayPanel() {
 
         <div>
           <label className="block text-xs text-gray-600 mb-1">TZ Override</label>
-          <input
+          <select
             className="input"
             value={tzOverride}
             onChange={(e) => setTzOverride(e.target.value)}
-            placeholder="auto"
-          />
+          >
+            {TZ_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
         </div>
 
         {error && (

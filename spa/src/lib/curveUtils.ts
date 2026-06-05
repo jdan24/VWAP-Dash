@@ -112,7 +112,23 @@ export function mergeCurveData(
   }
   if (todayProfile) todayProfile.forEach((r) => timeSet.add(r.time))
 
-  const times = [...timeSet].sort()
+  // Sort in session-relative order so overnight sessions (e.g. 17:00→16:00) render
+  // chronologically instead of alphabetically (which would put 00:xx before 17:xx).
+  const sessionStart =
+    curves.find((c) => c.visible && c.data.length > 0)?.data[0]?.time ??
+    todayProfile?.[0]?.time
+
+  const toSessionMin = (t: string, pivot: string): number => {
+    const [h, m] = t.split(':').map(Number)
+    const [ph, pm] = pivot.split(':').map(Number)
+    const mins = h * 60 + m
+    const pivotMins = ph * 60 + pm
+    return mins >= pivotMins ? mins - pivotMins : mins + 1440 - pivotMins
+  }
+
+  const times = sessionStart
+    ? [...timeSet].sort((a, b) => toSessionMin(a, sessionStart) - toSessionMin(b, sessionStart))
+    : [...timeSet].sort()
 
   // Build lookup maps for O(1) access
   const curveMaps = new Map<string, Map<string, number>>()

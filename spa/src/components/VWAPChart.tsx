@@ -5,6 +5,7 @@ import {
   LineChart,
   Line,
   Bar,
+  Brush,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -59,8 +60,8 @@ function ExportBar({
   }
 
   return (
-    <div className="flex gap-2 justify-end mt-1.5">
-      <span className="text-xs text-gray-400 mr-1 self-center">Export:</span>
+    <div className="flex gap-2 items-center">
+      <span className="text-xs text-gray-400 mr-1">Export:</span>
       {(['svg', 'png', 'jpg'] as ExportFormat[]).map((fmt) => (
         <button
           key={fmt}
@@ -148,6 +149,7 @@ export default function VWAPChart() {
                 <span className="ml-2 text-gray-400">· bars = today ({today.date})</span>
               )}
             </p>
+            <ExportBar label="vwap_profile" chartRef={profileRef} />
           </div>
 
           <div ref={profileRef} className="bg-white">
@@ -205,20 +207,29 @@ export default function VWAPChart() {
                     isAnimationActive={false}
                   />
                 ))}
+
+                <Brush
+                  dataKey="time"
+                  height={24}
+                  stroke="#d1d5db"
+                  fill="#f9fafb"
+                  travellerWidth={6}
+                />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-
-          <ExportBar label="vwap_profile" chartRef={profileRef} />
         </div>
       )}
 
       {/* ── Today's Price Chart ── */}
       {showToday && priceData.length > 0 && (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <p className="text-xs font-medium text-gray-600 mb-3">
-            Today's Last Price · {today!.date}
-          </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-medium text-gray-600">
+              Today's Last Price · {today!.date}
+            </p>
+            <ExportBar label={`price_${today!.date}`} chartRef={priceRef} />
+          </div>
 
           <div ref={priceRef} className="bg-white">
             <ResponsiveContainer width="100%" height={360}>
@@ -253,20 +264,29 @@ export default function VWAPChart() {
                   connectNulls={false}
                   isAnimationActive={false}
                 />
+
+                <Brush
+                  dataKey="time"
+                  height={24}
+                  stroke="#d1d5db"
+                  fill="#f9fafb"
+                  travellerWidth={6}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
-
-          <ExportBar label={`price_${today!.date}`} chartRef={priceRef} />
         </div>
       )}
 
       {/* ── Simulation Dot Plot ── */}
       {showSim && (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <p className="text-xs font-medium text-gray-600 mb-3">
-            Order Simulation · Child Orders (contracts per minute)
-          </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-medium text-gray-600">
+              Order Simulation · Child Orders (contracts per minute)
+            </p>
+            <ExportBar label="simulation" chartRef={simRef} />
+          </div>
 
           <div ref={simRef} className="bg-white">
             <ResponsiveContainer width="100%" height={400}>
@@ -317,8 +337,6 @@ export default function VWAPChart() {
               </ScatterChart>
             </ResponsiveContainer>
           </div>
-
-          <ExportBar label="simulation" chartRef={simRef} />
 
           <div className="mt-3 space-y-1 border-t border-gray-100 pt-3">
             {simulation.map((sim) => (

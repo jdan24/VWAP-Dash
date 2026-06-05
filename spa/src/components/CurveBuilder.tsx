@@ -3,6 +3,21 @@ import { useVWAPStore } from '../store/useVWAPStore'
 import { fetchVWAPCurve } from '../lib/bridgeClient'
 import type { VWAPCurve } from '../types'
 
+const TZ_OPTIONS = [
+  { value: '', label: 'auto-detect from Bloomberg' },
+  { value: 'America/New_York', label: 'America/New_York (Eastern)' },
+  { value: 'America/Chicago', label: 'America/Chicago (Central)' },
+  { value: 'America/Los_Angeles', label: 'America/Los_Angeles (Pacific)' },
+  { value: 'Europe/London', label: 'Europe/London' },
+  { value: 'Europe/Berlin', label: 'Europe/Berlin (CET/CEST)' },
+  { value: 'Europe/Rome', label: 'Europe/Rome' },
+  { value: 'Asia/Tokyo', label: 'Asia/Tokyo (JST)' },
+  { value: 'Asia/Singapore', label: 'Asia/Singapore (SGT)' },
+  { value: 'Asia/Hong_Kong', label: 'Asia/Hong_Kong (HKT)' },
+  { value: 'Australia/Sydney', label: 'Australia/Sydney (AEST)' },
+  { value: 'UTC', label: 'UTC' },
+]
+
 function isoDate(offsetDays = 0): string {
   const d = new Date()
   d.setDate(d.getDate() + offsetDays)
@@ -128,15 +143,16 @@ export default function CurveBuilder() {
         </div>
 
         <div>
-          <label className="block text-xs text-gray-600 mb-1">
-            TZ Override <span className="text-gray-400">(e.g. America/Chicago)</span>
-          </label>
-          <input
+          <label className="block text-xs text-gray-600 mb-1">TZ Override</label>
+          <select
             className="input"
             value={tzOverride}
             onChange={(e) => setTzOverride(e.target.value)}
-            placeholder="auto-detect from Bloomberg"
-          />
+          >
+            {TZ_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
         </div>
 
         <div className="flex items-center gap-3">

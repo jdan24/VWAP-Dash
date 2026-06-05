@@ -44,6 +44,7 @@ export interface TodayBarsParams {
   session_start: string   // "HH:MM" exchange local
   session_end?: string    // "HH:MM" exchange local — required for overnight sessions
   tz_override?: string
+  start_date?: string     // "YYYY-MM-DD" — overrides auto-detect of session date
 }
 
 export async function fetchTodayBars(params: TodayBarsParams) {
@@ -52,6 +53,7 @@ export async function fetchTodayBars(params: TodayBarsParams) {
   url.searchParams.set('session_start', params.session_start)
   if (params.session_end) url.searchParams.set('session_end', params.session_end)
   if (params.tz_override) url.searchParams.set('tz_override', params.tz_override)
+  if (params.start_date) url.searchParams.set('start_date', params.start_date)
 
   const res = await fetch(url.toString(), {
     signal: AbortSignal.timeout(30_000),

@@ -447,17 +447,20 @@ def today_bars(
     session_start: str = "09:30",
     session_end: str = "16:00",
     tz_override: str = "",
+    start_date: str = "",
 ):
     """
-    Pull today's 1-min bars from Bloomberg from session_start to now.
+    Pull 1-min bars from Bloomberg for a single session.
 
     session_start / session_end are in HH:MM exchange local time.
-    Supports overnight sessions (e.g. 17:00 → 16:00): when session_start > session_end
-    the bridge automatically determines whether the current moment is in the early-morning
-    portion of a session that started yesterday, or in the afternoon waiting for today's open.
+    Supports overnight sessions (e.g. 17:00 → 16:00).
+
+    start_date (optional, "YYYY-MM-DD"): the calendar date the session starts.
+      - If provided, fetch the complete session window (session_start → session_end).
+      - If omitted, auto-detect the current/most-recent session date and fetch up to now.
 
     Returns {date, bars: [{time, volume, close}]} where time is "HH:MM" exchange local.
-    The 'date' field is the date the session STARTED (not necessarily today's calendar date).
+    The 'date' field is the date the session STARTED.
     """
     _require_blpapi()
     ticker = resolve_ticker(security)
@@ -465,27 +468,32 @@ def today_bars(
 
     try:
         start_t = datetime.strptime(session_start.strip(), "%H:%M").time()
+        end_t = datetime.strptime(session_end.strip(), "%H:%M").time()
     except ValueError:
-        raise HTTPException(422, "Invalid session_start format — use HH:MM")
+        raise HTTPException(422, "Invalid session_start / session_end format — use HH:MM")
 
-    now_local = datetime.now(tz)
     overnight = _is_overnight(session_start, session_end)
 
-    if overnight:
-        now_hhmm = now_local.strftime("%H:%M")
-        # If we're currently before session_end (e.g. 01:30 AM during a 17:00→16:00 session),
-        # the active session started yesterday.
-        if now_hhmm < session_end:
-            session_date = now_local.date() - timedelta(days=1)
-        else:
-            # We're in the afternoon gap between session_end and session_start.
-            # The next session hasn't opened yet; pull whatever is available from today.
-            session_date = now_local.date()
+    if start_date.strip():
+        try:
+            session_date = date.fromisoformat(start_date.strip())
+        except ValueError:
+            raise HTTPException(422, "Invalid start_date format — use YYYY-MM-DD")
+        end_date_for_session = session_date + timedelta(days=1) if overnight else session_date
+        day_start_utc = tz.localize(datetime.combine(session_date, start_t)).astimezone(timezone.utc)
+        day_end_utc = tz.localize(datetime.combine(end_date_for_session, end_t)).astimezone(timezone.utc)
     else:
-        session_date = now_local.date()
-
-    day_start_utc = tz.localize(datetime.combine(session_date, start_t)).astimezone(timezone.utc)
-    day_end_utc = now_local.astimezone(timezone.utc)
+        now_local = datetime.now(tz)
+        if overnight:
+            now_hhmm = now_local.strftime("%H:%M")
+            if now_hhmm < session_end:
+                session_date = now_local.date() - timedelta(days=1)
+            else:
+                session_date = now_local.date()
+        else:
+            session_date = now_local.date()
+        day_start_utc = tz.localize(datetime.combine(session_date, start_t)).astimezone(timezone.utc)
+        day_end_utc = now_local.astimezone(timezone.utc)
 
     if day_end_utc <= day_start_utc:
         return {"date": session_date.isoformat(), "bars": []}
