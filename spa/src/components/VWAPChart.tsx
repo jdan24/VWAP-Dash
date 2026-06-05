@@ -1,7 +1,10 @@
+import { useRef, useState } from 'react'
 import {
   ResponsiveContainer,
+  ComposedChart,
   LineChart,
   Line,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -13,18 +16,13 @@ import {
 } from 'recharts'
 import { useVWAPStore } from '../store/useVWAPStore'
 import { mergeCurveData, timeToMinutes, minutesToHHMM } from '../lib/curveUtils'
+import { exportChart, type ExportFormat } from '../lib/chartExport'
 import type { YAxisKey } from '../store/useVWAPStore'
 
 const Y_AXIS_LABELS: Record<YAxisKey, string> = {
   PctBuckets: 'Pct Buckets (raw)',
   Smoothed: 'Smoothed %',
   AvgVolume: 'Avg Volume (contracts)',
-}
-
-// Tooltip formatter — show 4 decimal places for pct, 2 for volume
-function fmtValue(v: number, key: YAxisKey) {
-  if (key === 'AvgVolume') return v.toFixed(2)
-  return v.toFixed(4)
 }
 
 const CHART_STYLE = {
@@ -38,6 +36,47 @@ const CHART_STYLE = {
   itemStyle: { color: '#d1d5db' },
 }
 
+// ── Per-panel export toolbar ──────────────────────────────────────────────────
+
+function ExportBar({
+  label,
+  chartRef,
+}: {
+  label: string
+  chartRef: React.RefObject<HTMLDivElement | null>
+}) {
+  const [exporting, setExporting] = useState<ExportFormat | null>(null)
+
+  async function handle(fmt: ExportFormat) {
+    if (!chartRef.current || exporting) return
+    setExporting(fmt)
+    try {
+      await exportChart(chartRef.current, label, fmt)
+    } finally {
+      setExporting(null)
+    }
+  }
+
+  return (
+    <div className="flex gap-2 justify-end mt-1.5">
+      <span className="text-xs text-gray-700 mr-1 self-center">Export:</span>
+      {(['svg', 'png', 'jpg'] as ExportFormat[]).map((fmt) => (
+        <button
+          key={fmt}
+          onClick={() => handle(fmt)}
+          disabled={exporting !== null}
+          className="text-xs text-gray-500 hover:text-gray-200 uppercase tracking-wide transition-colors disabled:opacity-40 px-1"
+          title={`Export as ${fmt.toUpperCase()}`}
+        >
+          {exporting === fmt ? '…' : fmt}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function VWAPChart() {
   const { curves, yAxis, setYAxis, today, todayVisible, simulation } = useVWAPStore((s) => ({
     curves: s.curves,
@@ -48,31 +87,31 @@ export default function VWAPChart() {
     simulation: s.simulation,
   }))
 
+  const profileRef = useRef<HTMLDivElement>(null)
+  const priceRef = useRef<HTMLDivElement>(null)
+  const simRef = useRef<HTMLDivElement>(null)
+
   const todayProfile = todayVisible && today ? today.profile : undefined
   const mergedData = mergeCurveData(curves, yAxis, todayProfile)
-  const showToday = todayVisible && today && today.bars.length > 0
+
+  const showToday = !!(todayVisible && today && today.bars.length > 0)
   const showSim = simulation.length > 0
   const hasCurves = mergedData.length > 0
 
-  // Price chart data — uses today's bar close prices
-  const priceData = showToday
-    ? today!.bars.map((b) => ({ time: b.time, close: b.close }))
+  const priceData = showToday ? today!.bars.map((b) => ({ time: b.time, close: b.close })) : []
+
+  // Scatter chart numeric domain
+  const simMins = showSim
+    ? simulation.flatMap((s) => s.schedule.map((p) => timeToMinutes(p.time)))
     : []
+  const simXMin = simMins.length ? Math.min(...simMins) : 0
+  const simXMax = simMins.length ? Math.max(...simMins) : 1440
 
-  // Scatter chart: numeric x (minutes since midnight) for all sim results
-  const simXMin = showSim
-    ? Math.min(...simulation.flatMap((s) => s.schedule.map((p) => timeToMinutes(p.time))))
-    : 0
-  const simXMax = showSim
-    ? Math.max(...simulation.flatMap((s) => s.schedule.map((p) => timeToMinutes(p.time))))
-    : 1440
-
-  // Build hour-boundary ticks for scatter x-axis
   const simHourTicks: number[] = []
   if (showSim) {
-    const startHour = Math.ceil(simXMin / 60)
-    const endHour = Math.floor(simXMax / 60)
-    for (let h = startHour; h <= endHour; h++) simHourTicks.push(h * 60)
+    for (let h = Math.ceil(simXMin / 60); h <= Math.floor(simXMax / 60); h++) {
+      simHourTicks.push(h * 60)
+    }
   }
 
   return (
@@ -105,63 +144,73 @@ export default function VWAPChart() {
           <p className="text-xs text-gray-500 mb-2">
             VWAP Volume Profile · {Y_AXIS_LABELS[yAxis]}
             {today && todayVisible && (
-              <span className="ml-2 text-gray-600">· dashed = today ({today.date})</span>
+              <span className="ml-2 text-gray-600">· bars = today ({today.date})</span>
             )}
           </p>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart
-              data={mergedData}
-              syncId="vwap-chart"
-              margin={{ top: 4, right: 12, bottom: 4, left: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-              <XAxis
-                dataKey="time"
-                tick={{ fill: '#6b7280', fontSize: 10 }}
-                interval={29}
-              />
-              <YAxis
-                tick={{ fill: '#6b7280', fontSize: 10 }}
-                tickFormatter={(v: number) =>
-                  yAxis === 'AvgVolume' ? v.toFixed(1) : v.toFixed(2)
-                }
-                width={52}
-              />
-              <Tooltip
-                {...CHART_STYLE}
-                formatter={(v: unknown) =>
-                  typeof v === 'number' ? fmtValue(v, yAxis) : String(v)
-                }
-              />
-              <Legend wrapperStyle={{ color: '#9ca3af', fontSize: '11px', paddingTop: '8px' }} />
 
-              {curves.filter((c) => c.visible).map((c) => (
-                <Line
-                  key={c.id}
-                  dataKey={c.id}
-                  name={c.label}
-                  stroke={c.color}
-                  dot={false}
-                  strokeWidth={2}
-                  connectNulls={false}
-                  isAnimationActive={false}
+          {/* Capturable panel */}
+          <div ref={profileRef} className="bg-gray-950 rounded p-1">
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart
+                data={mergedData}
+                syncId="vwap-chart"
+                margin={{ top: 4, right: 12, bottom: 4, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <XAxis
+                  dataKey="time"
+                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  interval={29}
                 />
-              ))}
+                <YAxis
+                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  tickFormatter={(v: number) =>
+                    yAxis === 'AvgVolume' ? v.toFixed(1) : v.toFixed(2)
+                  }
+                  width={52}
+                />
+                <Tooltip
+                  {...CHART_STYLE}
+                  formatter={(v: unknown) =>
+                    typeof v === 'number'
+                      ? [yAxis === 'AvgVolume' ? v.toFixed(2) : v.toFixed(4)]
+                      : [String(v)]
+                  }
+                />
+                <Legend
+                  wrapperStyle={{ color: '#9ca3af', fontSize: '11px', paddingTop: '8px' }}
+                />
 
-              {todayProfile && (
-                <Line
-                  dataKey="__today__"
-                  name={`Today (${today!.date})`}
-                  stroke="#e5e7eb"
-                  dot={false}
-                  strokeWidth={1.5}
-                  strokeDasharray="5 4"
-                  connectNulls={false}
-                  isAnimationActive={false}
-                />
-              )}
-            </LineChart>
-          </ResponsiveContainer>
+                {/* Today's volume as solid bars (rendered first so lines sit on top) */}
+                {todayProfile && (
+                  <Bar
+                    dataKey="__today__"
+                    name={`Today (${today!.date})`}
+                    fill="#6b7280"
+                    opacity={0.55}
+                    barSize={2}
+                    isAnimationActive={false}
+                  />
+                )}
+
+                {/* Historical curves as lines */}
+                {curves.filter((c) => c.visible).map((c) => (
+                  <Line
+                    key={c.id}
+                    dataKey={c.id}
+                    name={c.label}
+                    stroke={c.color}
+                    dot={false}
+                    strokeWidth={2}
+                    connectNulls={false}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          <ExportBar label="vwap_profile" chartRef={profileRef} />
         </div>
       )}
 
@@ -171,40 +220,45 @@ export default function VWAPChart() {
           <p className="text-xs text-gray-500 mb-2">
             Today's Last Price · {today!.date}
           </p>
-          <ResponsiveContainer width="100%" height={180}>
-            <LineChart
-              data={priceData}
-              syncId="vwap-chart"
-              margin={{ top: 4, right: 12, bottom: 4, left: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-              <XAxis
-                dataKey="time"
-                tick={{ fill: '#6b7280', fontSize: 10 }}
-                interval={29}
-              />
-              <YAxis
-                tick={{ fill: '#6b7280', fontSize: 10 }}
-                width={52}
-                domain={['auto', 'auto']}
-              />
-              <Tooltip
-                {...CHART_STYLE}
-                formatter={(v: unknown) =>
-                  typeof v === 'number' ? v.toFixed(2) : String(v)
-                }
-              />
-              <Line
-                dataKey="close"
-                name="Last Price"
-                stroke="#93c5fd"
-                dot={false}
-                strokeWidth={1.5}
-                connectNulls={false}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+
+          <div ref={priceRef} className="bg-gray-950 rounded p-1">
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart
+                data={priceData}
+                syncId="vwap-chart"
+                margin={{ top: 4, right: 12, bottom: 4, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <XAxis
+                  dataKey="time"
+                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  interval={29}
+                />
+                <YAxis
+                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  width={52}
+                  domain={['auto', 'auto']}
+                />
+                <Tooltip
+                  {...CHART_STYLE}
+                  formatter={(v: unknown) =>
+                    typeof v === 'number' ? [v.toFixed(2)] : [String(v)]
+                  }
+                />
+                <Line
+                  dataKey="close"
+                  name="Last Price"
+                  stroke="#93c5fd"
+                  dot={false}
+                  strokeWidth={1.5}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <ExportBar label={`price_${today!.date}`} chartRef={priceRef} />
         </div>
       )}
 
@@ -214,47 +268,60 @@ export default function VWAPChart() {
           <p className="text-xs text-gray-500 mb-2">
             Order Simulation · Child Orders (contracts per minute)
           </p>
-          <ResponsiveContainer width="100%" height={200}>
-            <ScatterChart margin={{ top: 4, right: 12, bottom: 4, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-              <XAxis
-                type="number"
-                dataKey="x"
-                name="Time"
-                domain={[simXMin, simXMax]}
-                ticks={simHourTicks}
-                tickFormatter={(v: number) => minutesToHHMM(v)}
-                tick={{ fill: '#6b7280', fontSize: 10 }}
-              />
-              <YAxis
-                type="number"
-                dataKey="y"
-                name="Qty"
-                tick={{ fill: '#6b7280', fontSize: 10 }}
-                width={52}
-                allowDecimals={false}
-              />
-              <ZAxis range={[40, 40]} />
-              <Tooltip
-                cursor={{ strokeDasharray: '3 3', stroke: '#374151' }}
-                {...CHART_STYLE}
-                formatter={(v: unknown, name: unknown) => [`${v} contracts`, String(name ?? '')]}
-                labelFormatter={(label: unknown) =>
-                  typeof label === 'number' ? minutesToHHMM(label) : String(label ?? '')
-                }
-              />
-              <Legend wrapperStyle={{ color: '#9ca3af', fontSize: '11px', paddingTop: '8px' }} />
-              {simulation.map((sim) => (
-                <Scatter
-                  key={sim.curveId}
-                  name={`${sim.curveLabel} (${sim.totalScheduled} total)`}
-                  data={sim.schedule.map((s) => ({ x: timeToMinutes(s.time), y: s.qty }))}
-                  fill={sim.color}
-                  isAnimationActive={false}
+
+          <div ref={simRef} className="bg-gray-950 rounded p-1">
+            <ResponsiveContainer width="100%" height={200}>
+              <ScatterChart margin={{ top: 4, right: 12, bottom: 4, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <XAxis
+                  type="number"
+                  dataKey="x"
+                  name="Time"
+                  domain={[simXMin, simXMax]}
+                  ticks={simHourTicks}
+                  tickFormatter={(v: number) => minutesToHHMM(v)}
+                  tick={{ fill: '#6b7280', fontSize: 10 }}
                 />
-              ))}
-            </ScatterChart>
-          </ResponsiveContainer>
+                <YAxis
+                  type="number"
+                  dataKey="y"
+                  name="Qty"
+                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  width={52}
+                  allowDecimals={false}
+                />
+                <ZAxis range={[40, 40]} />
+                <Tooltip
+                  cursor={{ strokeDasharray: '3 3', stroke: '#374151' }}
+                  {...CHART_STYLE}
+                  formatter={(v: unknown, name: unknown) => [
+                    `${v} contracts`,
+                    String(name ?? ''),
+                  ]}
+                  labelFormatter={(label: unknown) =>
+                    typeof label === 'number' ? minutesToHHMM(label) : String(label ?? '')
+                  }
+                />
+                <Legend
+                  wrapperStyle={{ color: '#9ca3af', fontSize: '11px', paddingTop: '8px' }}
+                />
+                {simulation.map((sim) => (
+                  <Scatter
+                    key={sim.curveId}
+                    name={`${sim.curveLabel} (${sim.totalScheduled} total)`}
+                    data={sim.schedule.map((s) => ({
+                      x: timeToMinutes(s.time),
+                      y: s.qty,
+                    }))}
+                    fill={sim.color}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+
+          <ExportBar label="simulation" chartRef={simRef} />
 
           {/* Summary rows */}
           <div className="mt-2 space-y-1">
