@@ -41,7 +41,8 @@ export async function fetchVWAPCurve(params: VWAPCurveParams) {
 
 export interface TodayBarsParams {
   security: string
-  session_start: string  // "HH:MM" exchange local
+  session_start: string   // "HH:MM" exchange local
+  session_end?: string    // "HH:MM" exchange local — required for overnight sessions
   tz_override?: string
 }
 
@@ -49,6 +50,7 @@ export async function fetchTodayBars(params: TodayBarsParams) {
   const url = new URL(`${BRIDGE_BASE}/today-bars`)
   url.searchParams.set('security', params.security)
   url.searchParams.set('session_start', params.session_start)
+  if (params.session_end) url.searchParams.set('session_end', params.session_end)
   if (params.tz_override) url.searchParams.set('tz_override', params.tz_override)
 
   const res = await fetch(url.toString(), {

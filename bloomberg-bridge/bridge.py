@@ -277,11 +277,24 @@ def _resolve_timezone(ticker: str, tz_override: str) -> Any:
 
 # ── VWAP helpers ──────────────────────────────────────────────────────────────
 
+def _is_overnight(start_hhmm: str, end_hhmm: str) -> bool:
+    """Return True when the session crosses midnight (e.g. 17:00 → 16:00 next day)."""
+    return end_hhmm <= start_hhmm
+
+
 def _build_canonical_minutes(start_hhmm: str, end_hhmm: str) -> list[str]:
-    """Build ["HH:MM", ...] list from session_start to session_end (exclusive)."""
+    """
+    Build ["HH:MM", ...] list for a trading session.
+
+    Handles both same-day sessions (09:30 → 16:00) and overnight sessions
+    that cross midnight (17:00 → 16:00 next calendar day).  String comparison
+    on HH:MM is safe because lexicographic order matches temporal order.
+    """
     base = date.today()
     t = datetime.strptime(f"{base} {start_hhmm}", "%Y-%m-%d %H:%M")
-    stop = datetime.strptime(f"{base} {end_hhmm}", "%Y-%m-%d %H:%M")
+    # Overnight: end time is on the NEXT calendar day
+    end_base = base + timedelta(days=1) if _is_overnight(start_hhmm, end_hhmm) else base
+    stop = datetime.strptime(f"{end_base} {end_hhmm}", "%Y-%m-%d %H:%M")
     minutes = []
     while t < stop:
         minutes.append(t.strftime("%H:%M"))
@@ -340,24 +353,29 @@ def vwap_curve(
         raise HTTPException(422, f"Invalid datetime format (use YYYY-MM-DD HH:MM): {exc}")
 
     if end_local <= start_local:
-        raise HTTPException(422, "end must be after start")
+        raise HTTPException(422, "end must be after start (as full datetimes)")
 
     session_start = start_local.strftime("%H:%M")
     session_end = end_local.strftime("%H:%M")
+    overnight = _is_overnight(session_start, session_end)
     canonical = _build_canonical_minutes(session_start, session_end)
     if not canonical:
-        raise HTTPException(422, "Session window is empty — start time must be before end time")
+        raise HTTPException(422, "Session window is empty — start and end times are identical")
 
     vol_sums: dict[str, float] = {m: 0.0 for m in canonical}
     trading_days = 0
 
     current = start_local.date()
-    last_date = end_local.date()
+    # For overnight sessions (17:00→16:00), the last session *starts* one day before end_date
+    # because that session runs current→current+1.  For daytime, last start == end_date.
+    last_start = end_local.date() - timedelta(days=1) if overnight else end_local.date()
 
-    while current <= last_date:
+    while current <= last_start:
         try:
             day_start = tz.localize(datetime.combine(current, start_local.time()))
-            day_end = tz.localize(datetime.combine(current, end_local.time()))
+            # Overnight: session ends on the next calendar day
+            end_date_for_day = current + timedelta(days=1) if overnight else current
+            day_end = tz.localize(datetime.combine(end_date_for_day, end_local.time()))
             bars = _get_intraday_bars_raw(
                 ticker,
                 day_start.astimezone(timezone.utc),
@@ -427,31 +445,50 @@ def vwap_curve(
 def today_bars(
     security: str,
     session_start: str = "09:30",
+    session_end: str = "16:00",
     tz_override: str = "",
 ):
     """
     Pull today's 1-min bars from Bloomberg from session_start to now.
 
-    session_start is in HH:MM exchange local time.
-    Returns {date, bars: [{time, volume, close}]} where time is "HH:MM".
+    session_start / session_end are in HH:MM exchange local time.
+    Supports overnight sessions (e.g. 17:00 → 16:00): when session_start > session_end
+    the bridge automatically determines whether the current moment is in the early-morning
+    portion of a session that started yesterday, or in the afternoon waiting for today's open.
+
+    Returns {date, bars: [{time, volume, close}]} where time is "HH:MM" exchange local.
+    The 'date' field is the date the session STARTED (not necessarily today's calendar date).
     """
     _require_blpapi()
     ticker = resolve_ticker(security)
     tz = _resolve_timezone(ticker, tz_override)
 
     try:
-        start_time = datetime.strptime(session_start.strip(), "%H:%M").time()
+        start_t = datetime.strptime(session_start.strip(), "%H:%M").time()
     except ValueError:
         raise HTTPException(422, "Invalid session_start format — use HH:MM")
 
     now_local = datetime.now(tz)
-    today = now_local.date()
+    overnight = _is_overnight(session_start, session_end)
 
-    day_start_utc = tz.localize(datetime.combine(today, start_time)).astimezone(timezone.utc)
+    if overnight:
+        now_hhmm = now_local.strftime("%H:%M")
+        # If we're currently before session_end (e.g. 01:30 AM during a 17:00→16:00 session),
+        # the active session started yesterday.
+        if now_hhmm < session_end:
+            session_date = now_local.date() - timedelta(days=1)
+        else:
+            # We're in the afternoon gap between session_end and session_start.
+            # The next session hasn't opened yet; pull whatever is available from today.
+            session_date = now_local.date()
+    else:
+        session_date = now_local.date()
+
+    day_start_utc = tz.localize(datetime.combine(session_date, start_t)).astimezone(timezone.utc)
     day_end_utc = now_local.astimezone(timezone.utc)
 
     if day_end_utc <= day_start_utc:
-        return {"date": today.isoformat(), "bars": []}
+        return {"date": session_date.isoformat(), "bars": []}
 
     bars = _get_intraday_bars_raw(ticker, day_start_utc, day_end_utc, 1)
 
@@ -460,7 +497,7 @@ def today_bars(
         for bar in bars
     ]
 
-    return {"date": today.isoformat(), "bars": formatted}
+    return {"date": session_date.isoformat(), "bars": formatted}
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

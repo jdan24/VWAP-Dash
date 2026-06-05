@@ -19,6 +19,9 @@ export default function TodayPanel() {
   const [sessionStart, setSessionStart] = useState(
     firstParams?.start?.slice(11, 16) ?? '09:30',
   )
+  const [sessionEnd, setSessionEnd] = useState(
+    firstParams?.end?.slice(11, 16) ?? '16:00',
+  )
   const [tzOverride, setTzOverride] = useState(firstParams?.tzOverride ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -34,6 +37,7 @@ export default function TodayPanel() {
       const result = await fetchTodayBars({
         security: security.trim(),
         session_start: sessionStart,
+        session_end: sessionEnd,
         tz_override: tzOverride.trim(),
       })
 
@@ -89,14 +93,24 @@ export default function TodayPanel() {
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-600 mb-1">TZ Override</label>
+            <label className="block text-xs text-gray-600 mb-1">Session End</label>
             <input
+              type="time"
               className="input"
-              value={tzOverride}
-              onChange={(e) => setTzOverride(e.target.value)}
-              placeholder="auto"
+              value={sessionEnd}
+              onChange={(e) => setSessionEnd(e.target.value)}
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-600 mb-1">TZ Override</label>
+          <input
+            className="input"
+            value={tzOverride}
+            onChange={(e) => setTzOverride(e.target.value)}
+            placeholder="auto"
+          />
         </div>
 
         {error && (
