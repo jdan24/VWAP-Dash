@@ -141,9 +141,12 @@ def blp_dt_to_iso(value: Any) -> str:
     if isinstance(value, datetime):
         return value.isoformat()
     try:
+        # Bloomberg's internal datetime type (blpapi.Datetime) always stores
+        # bar times in UTC — tag the fields as UTC so _bar_hhmm converts correctly.
         return datetime(
             value.year, value.month, value.day,
             value.hour, value.minute, value.second,
+            tzinfo=timezone.utc,
         ).isoformat()
     except Exception:
         return str(value)
@@ -184,19 +187,19 @@ def _get_reference_fields(ticker: str, fields: list[str]) -> dict[str, Any]:
 
 def _bar_hhmm(raw_time: str, tz: Any) -> str:
     """
-    Extract HH:MM from a bar timestamp in exchange-local time.
+    Convert a bar timestamp to HH:MM in the target timezone.
 
-    Bloomberg sometimes returns bar times as UTC-aware Python datetimes
-    (e.g. "2026-06-05T14:30:00+00:00") and sometimes as naive ISO strings
-    that are already in exchange local time (e.g. "2026-06-05T09:30:00").
-    Both cases are handled: UTC-aware values are converted to exchange local
-    using the known pytz timezone before extracting HH:MM.
+    Bloomberg IntradayBarRequest bar times are always UTC.  They arrive as either
+    a UTC-aware ISO string ("+00:00") or a naive ISO string whose values are UTC
+    (produced by blp_dt_to_iso when Bloomberg returns its internal datetime type
+    as a Python datetime without tzinfo).  In both cases we normalise to UTC-aware
+    before converting so the local-time extraction is always correct.
     """
     try:
         dt = datetime.fromisoformat(raw_time)
-        if dt.tzinfo is not None:
-            dt = dt.astimezone(tz)
-        return dt.strftime("%H:%M")
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(tz).strftime("%H:%M")
     except Exception:
         return raw_time[11:16]  # last-resort slice fallback
 
