@@ -1,11 +1,11 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import {
   ResponsiveContainer,
   ComposedChart,
   LineChart,
   Line,
   Bar,
-  Brush,
+  ReferenceArea,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -18,21 +18,22 @@ import {
 import { useVWAPStore } from '../store/useVWAPStore'
 import { mergeCurveData, timeToMinutes, minutesToHHMM } from '../lib/curveUtils'
 import { exportChart, type ExportFormat } from '../lib/chartExport'
+import { useBoxZoom } from '../lib/useBoxZoom'
 import type { YAxisKey } from '../store/useVWAPStore'
 import type { VWAPCurve } from '../types'
 
 const TZ_SHORT: Record<string, string> = {
-  'America/New_York':   'ET',
-  'America/Chicago':    'CT',
-  'America/Los_Angeles':'PT',
-  'Europe/London':      'GMT/BST',
-  'Europe/Berlin':      'CET',
-  'Europe/Rome':        'CET',
-  'Asia/Tokyo':         'JST',
-  'Asia/Singapore':     'SGT',
-  'Asia/Hong_Kong':     'HKT',
-  'Australia/Sydney':   'AEST',
-  'UTC':                'UTC',
+  'America/New_York':    'ET',
+  'America/Chicago':     'CT',
+  'America/Los_Angeles': 'PT',
+  'Europe/London':       'GMT/BST',
+  'Europe/Berlin':       'CET',
+  'Europe/Rome':         'CET',
+  'Asia/Tokyo':          'JST',
+  'Asia/Singapore':      'SGT',
+  'Asia/Hong_Kong':      'HKT',
+  'Australia/Sydney':    'AEST',
+  'UTC':                 'UTC',
 }
 
 function tzLabel(tzOverride: string): string {
@@ -45,10 +46,15 @@ function curveTzLabel(curves: VWAPCurve[]): string {
   return tzLabel(tz)
 }
 
+/** How many x-axis ticks to aim for. */
+function tickInterval(dataLen: number): number {
+  return Math.max(0, Math.floor(dataLen / 12) - 1)
+}
+
 const Y_AXIS_LABELS: Record<YAxisKey, string> = {
   PctBuckets: 'Pct Buckets (raw)',
-  Smoothed: 'Smoothed %',
-  AvgVolume: 'Avg Volume (contracts)',
+  Smoothed:   'Smoothed %',
+  AvgVolume:  'Avg Volume (contracts)',
 }
 
 const CHART_STYLE = {
@@ -60,7 +66,7 @@ const CHART_STYLE = {
     color: '#111827',
   },
   labelStyle: { color: '#374151' },
-  itemStyle: { color: '#374151' },
+  itemStyle:  { color: '#374151' },
 }
 
 // ── Per-panel export toolbar ──────────────────────────────────────────────────
@@ -106,27 +112,41 @@ function ExportBar({
 
 export default function VWAPChart() {
   const { curves, yAxis, setYAxis, today, todayVisible, simulation } = useVWAPStore((s) => ({
-    curves: s.curves,
-    yAxis: s.yAxis,
-    setYAxis: s.setYAxis,
-    today: s.today,
+    curves:       s.curves,
+    yAxis:        s.yAxis,
+    setYAxis:     s.setYAxis,
+    today:        s.today,
     todayVisible: s.todayVisible,
-    simulation: s.simulation,
+    simulation:   s.simulation,
   }))
 
   const profileRef = useRef<HTMLDivElement>(null)
-  const priceRef = useRef<HTMLDivElement>(null)
-  const simRef = useRef<HTMLDivElement>(null)
+  const priceRef   = useRef<HTMLDivElement>(null)
+  const simRef     = useRef<HTMLDivElement>(null)
 
   const todayProfile = todayVisible && today ? today.profile : undefined
-  const mergedData = mergeCurveData(curves, yAxis, todayProfile)
+
+  // Memoize derived datasets so useBoxZoom can detect real data changes
+  const mergedData = useMemo(
+    () => mergeCurveData(curves, yAxis, todayProfile),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [curves, yAxis, todayVisible, today],
+  )
 
   const showToday = !!(todayVisible && today && today.bars.length > 0)
-  const showSim = simulation.length > 0
+  const showSim   = simulation.length > 0
   const hasCurves = mergedData.length > 0
 
-  const priceData = showToday ? today!.bars.map((b) => ({ time: b.time, close: b.close })) : []
+  const priceData = useMemo(
+    () => showToday ? today!.bars.map((b) => ({ time: b.time, close: b.close })) : [],
+    [showToday, today],
+  )
 
+  // ── Box zoom state (independent per chart) ───────────────────────────────
+  const profileZoom = useBoxZoom(mergedData as { time: string }[])
+  const priceZoom   = useBoxZoom(priceData)
+
+  // ── Simulation x-axis ────────────────────────────────────────────────────
   const simMins = showSim
     ? simulation.flatMap((s) => s.schedule.map((p) => timeToMinutes(p.time)))
     : []
@@ -175,21 +195,35 @@ export default function VWAPChart() {
                 <span className="ml-2 text-gray-400">· bars = today ({today.date})</span>
               )}
             </p>
-            <ExportBar label="vwap_profile" chartRef={profileRef} />
+            <div className="flex items-center gap-3">
+              {profileZoom.isZoomed && (
+                <button
+                  onClick={profileZoom.reset}
+                  className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+                  title="Reset zoom (or double-click chart)"
+                >
+                  ↺ Reset zoom
+                </button>
+              )}
+              <ExportBar label="vwap_profile" chartRef={profileRef} />
+            </div>
           </div>
 
-          <div ref={profileRef} className="bg-white">
+          <div ref={profileRef} className="bg-white" style={{ cursor: 'crosshair', userSelect: 'none' }}>
             <ResponsiveContainer width="100%" height={600}>
               <ComposedChart
-                data={mergedData}
+                data={profileZoom.visibleData as Record<string, unknown>[]}
                 syncId="vwap-chart"
                 margin={{ top: 4, right: 12, bottom: 4, left: 0 }}
+                onMouseDown={profileZoom.onMouseDown}
+                onMouseMove={profileZoom.onMouseMove}
+                onDoubleClick={profileZoom.reset}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis
                   dataKey="time"
                   tick={{ fill: '#9ca3af', fontSize: 10 }}
-                  interval={29}
+                  interval={tickInterval(profileZoom.visibleData.length)}
                 />
                 <YAxis
                   tick={{ fill: '#9ca3af', fontSize: 10 }}
@@ -208,7 +242,6 @@ export default function VWAPChart() {
                 />
                 <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
 
-                {/* Today's volume as solid bars (behind the historical lines) */}
                 {todayProfile && (
                   <Bar
                     dataKey="__today__"
@@ -220,7 +253,6 @@ export default function VWAPChart() {
                   />
                 )}
 
-                {/* Historical curves */}
                 {curves.filter((c) => c.visible).map((c) => (
                   <Line
                     key={c.id}
@@ -234,16 +266,24 @@ export default function VWAPChart() {
                   />
                 ))}
 
-                <Brush
-                  dataKey="time"
-                  height={24}
-                  stroke="#d1d5db"
-                  fill="#f9fafb"
-                  travellerWidth={6}
-                />
+                {/* Selection rectangle shown while dragging */}
+                {profileZoom.selStart && profileZoom.selEnd && (
+                  <ReferenceArea
+                    x1={profileZoom.selStart}
+                    x2={profileZoom.selEnd}
+                    fill="#3b82f6"
+                    fillOpacity={0.15}
+                    stroke="#3b82f6"
+                    strokeOpacity={0.5}
+                    strokeDasharray="4 2"
+                  />
+                )}
               </ComposedChart>
             </ResponsiveContainer>
           </div>
+          <p className="text-xs text-gray-400 mt-1.5 text-right">
+            Drag to zoom · double-click to reset
+          </p>
         </div>
       )}
 
@@ -255,21 +295,35 @@ export default function VWAPChart() {
               Today's Last Price · {today!.date}
               <span className="ml-2 text-gray-400">· {tzLabel(today!.tzOverride)}</span>
             </p>
-            <ExportBar label={`price_${today!.date}`} chartRef={priceRef} />
+            <div className="flex items-center gap-3">
+              {priceZoom.isZoomed && (
+                <button
+                  onClick={priceZoom.reset}
+                  className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+                  title="Reset zoom (or double-click chart)"
+                >
+                  ↺ Reset zoom
+                </button>
+              )}
+              <ExportBar label={`price_${today!.date}`} chartRef={priceRef} />
+            </div>
           </div>
 
-          <div ref={priceRef} className="bg-white">
+          <div ref={priceRef} className="bg-white" style={{ cursor: 'crosshair', userSelect: 'none' }}>
             <ResponsiveContainer width="100%" height={360}>
               <LineChart
-                data={priceData}
+                data={priceZoom.visibleData}
                 syncId="vwap-chart"
                 margin={{ top: 4, right: 12, bottom: 4, left: 0 }}
+                onMouseDown={priceZoom.onMouseDown}
+                onMouseMove={priceZoom.onMouseMove}
+                onDoubleClick={priceZoom.reset}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis
                   dataKey="time"
                   tick={{ fill: '#9ca3af', fontSize: 10 }}
-                  interval={29}
+                  interval={tickInterval(priceZoom.visibleData.length)}
                 />
                 <YAxis
                   tick={{ fill: '#9ca3af', fontSize: 10 }}
@@ -292,16 +346,23 @@ export default function VWAPChart() {
                   isAnimationActive={false}
                 />
 
-                <Brush
-                  dataKey="time"
-                  height={24}
-                  stroke="#d1d5db"
-                  fill="#f9fafb"
-                  travellerWidth={6}
-                />
+                {priceZoom.selStart && priceZoom.selEnd && (
+                  <ReferenceArea
+                    x1={priceZoom.selStart}
+                    x2={priceZoom.selEnd}
+                    fill="#3b82f6"
+                    fillOpacity={0.15}
+                    stroke="#3b82f6"
+                    strokeOpacity={0.5}
+                    strokeDasharray="4 2"
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
+          <p className="text-xs text-gray-400 mt-1.5 text-right">
+            Drag to zoom · double-click to reset
+          </p>
         </div>
       )}
 
